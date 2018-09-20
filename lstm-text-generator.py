@@ -10,7 +10,7 @@ If you try this script on new data, make sure your corpus
 has at least ~100k characters. ~1M is better.
 '''
 
-from keras.callbacks import LambdaCallback
+from keras.callbacks import LambdaCallback, TensorBoard
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
@@ -20,6 +20,14 @@ import numpy as np
 import random
 import sys
 import io
+
+from datetime import datetime
+import os
+import time
+
+# Constants
+TB_LOGDIR = 'logdir'
+DATETIME_FORMAT = '%y-%m-%d_%H-%M'
 
 
 def main():
@@ -105,13 +113,17 @@ def main():
                 sys.stdout.flush()
             print()
 
-
     print_callback = LambdaCallback(on_epoch_end=on_epoch_end)
+
+    # Tensorboard
+    timestamp = datetime.fromtimestamp(time.time()).strftime(DATETIME_FORMAT)
+    log_dir = os.path.join(TB_LOGDIR, timestamp)
+    tb_callback = TensorBoard(log_dir=log_dir)
 
     model.fit(x, y,
               batch_size=128,
               epochs=60,
-              callbacks=[print_callback])
+              callbacks=[print_callback, tb_callback])
 
 
 if __name__ == '__main__':
