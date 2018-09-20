@@ -71,13 +71,20 @@ optimizer = RMSprop(lr=0.01)
 model.compile(loss='categorical_crossentropy', optimizer=optimizer)
 
 
-def sample(preds, temperature=1.0):
-    # helper function to sample an index from a probability array
+def sample(preds, diversity=1.0):
+    """ Helper function to sample an index from a probability array
+
+    :param preds: list of int
+        Prediction indeces
+    :param diversity: float
+        Degree of creativity/randomness
+    :return: int
+        Sampled index
+    """
     preds = np.asarray(preds).astype('float64')
-    preds = np.log(preds) / temperature
-    exp_preds = np.exp(preds)
-    preds = exp_preds / np.sum(exp_preds)
-    probas = np.random.multinomial(1, preds, 1)
+    preds = preds**(1 / diversity)
+    preds = preds / np.sum(preds)
+    probas = np.random.multinomial(n=1, pvals=preds, size=1)
     return np.argmax(probas)
 
 
