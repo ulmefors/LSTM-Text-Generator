@@ -29,6 +29,12 @@ import time
 TB_LOGDIR = 'logdir'
 DATETIME_FORMAT = '%y-%m-%d_%H-%M'
 
+# Parameters
+MAX_LEN = 40
+CHAR_STEP = 3
+DIVERSITIES = [0.2, 0.5, 1.0, 1.2]
+BATCH_SIZE = 128
+EPOCHS = 60
 
 path = get_file(
     'nietzsche.txt',
@@ -42,18 +48,16 @@ print('total chars:', len(chars))
 char_indices = dict((c, i) for i, c in enumerate(chars))
 indices_char = dict((i, c) for i, c in enumerate(chars))
 
-# cut the text in semi-redundant sequences of maxlen characters
-maxlen = 40
-step = 3
+# Cut the text in semi-redundant sequences of MAX_LEN characters
 sentences = []
 next_chars = []
-for i in range(0, len(text) - maxlen, step):
-    sentences.append(text[i: i + maxlen])
-    next_chars.append(text[i + maxlen])
+for i in range(0, len(text) - MAX_LEN, CHAR_STEP):
+    sentences.append(text[i: i + MAX_LEN])
+    next_chars.append(text[i + MAX_LEN])
 print('nb sequences:', len(sentences))
 
 print('Vectorization...')
-x = np.zeros((len(sentences), maxlen, len(chars)), dtype=np.bool)
+x = np.zeros((len(sentences), MAX_LEN, len(chars)), dtype=np.bool)
 y = np.zeros((len(sentences), len(chars)), dtype=np.bool)
 for i, sentence in enumerate(sentences):
     for t, char in enumerate(sentence):
@@ -64,7 +68,7 @@ for i, sentence in enumerate(sentences):
 # Build the model: a single LSTM
 print('Build model...')
 model = Sequential()
-model.add(LSTM(128, input_shape=(maxlen, len(chars))))
+model.add(LSTM(128, input_shape=(MAX_LEN, len(chars))))
 model.add(Dense(len(chars), activation='softmax'))
 
 optimizer = RMSprop(lr=0.01)
@@ -93,18 +97,18 @@ def on_epoch_end(epoch, _):
     print()
     print('----- Generating text after Epoch: %d' % epoch)
 
-    start_index = random.randint(0, len(text) - maxlen - 1)
-    for diversity in [0.2, 0.5, 1.0, 1.2]:
+    start_index = random.randint(0, len(text) - MAX_LEN - 1)
+    for diversity in DIVERSITIES:
         print('----- diversity:', diversity)
 
         generated = ''
-        sentence = text[start_index: start_index + maxlen]
+        sentence = text[start_index: start_index + MAX_LEN]
         generated += sentence
         print('----- Generating with seed: "' + sentence + '"')
         sys.stdout.write(generated)
 
         for i in range(400):
-            x_pred = np.zeros((1, maxlen, len(chars)))
+            x_pred = np.zeros((1, MAX_LEN, len(chars)))
             for t, char in enumerate(sentence):
                 x_pred[0, t, char_indices[char]] = 1.
 
@@ -128,6 +132,6 @@ log_dir = os.path.join(TB_LOGDIR, timestamp)
 tb_callback = TensorBoard(log_dir=log_dir)
 
 model.fit(x, y,
-          batch_size=128,
-          epochs=60,
+          batch_size=BATCH_SIZE,
+          epochs=EPOCHS,
           callbacks=[print_callback, tb_callback])
