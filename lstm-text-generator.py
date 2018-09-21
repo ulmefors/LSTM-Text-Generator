@@ -1,4 +1,4 @@
-'''Example script to generate text from Nietzsche's writings.
+"""Example script to generate text from Nietzsche's writings.
 
 At least 20 epochs are required before the generated text
 starts sounding coherent.
@@ -8,7 +8,7 @@ networks are quite computationally intensive.
 
 If you try this script on new data, make sure your corpus
 has at least ~100k characters. ~1M is better.
-'''
+"""
 
 from keras.callbacks import LambdaCallback, TensorBoard
 from keras.models import Sequential
@@ -26,6 +26,7 @@ import os
 import time
 
 # Constants
+CORPUS_DIR = 'data'
 TB_LOGDIR = 'logdir'
 DATETIME_FORMAT = '%y-%m-%d_%H-%M'
 
@@ -35,16 +36,34 @@ CHAR_STEP = 3
 DIVERSITIES = [0.2, 0.5, 1.0, 1.2]
 BATCH_SIZE = 128
 EPOCHS = 60
+LEARNING_RATE = 0.01
 
-path = get_file(
-    'nietzsche.txt',
-    origin='https://s3.amazonaws.com/text-datasets/nietzsche.txt')
-with io.open(path, encoding='utf-8') as f:
+# Source
+CORPUS = 'nietzsche'
+
+
+def get_path(corpus='nietzsche'):
+    """ Choose corpus for training
+
+    :param corpus: {'nietzsche', 'donquijote'}, default 'nietzsche'
+    :return: path
+        Path to selected corpus
+    """
+    if corpus == 'donquijote':
+        path = os.path.join(CORPUS_DIR, 'donquijote.txt')
+    else:
+        origin = 'https://s3.amazonaws.com/text-datasets/nietzsche.txt'
+        path = get_file('nietzsche.txt', origin=origin)
+    return path
+
+
+with io.open(get_path(corpus=CORPUS), encoding='utf-8') as f:
+    # Use lower case to reduce dictionary size
     text = f.read().lower()
-print('corpus length:', len(text))
+print('Corpus length:', len(text))
 
 chars = sorted(list(set(text)))
-print('total chars:', len(chars))
+print('Total chars:', len(chars))
 char_indices = dict((c, i) for i, c in enumerate(chars))
 indices_char = dict((i, c) for i, c in enumerate(chars))
 
@@ -54,7 +73,7 @@ next_chars = []
 for i in range(0, len(text) - MAX_LEN, CHAR_STEP):
     sentences.append(text[i: i + MAX_LEN])
     next_chars.append(text[i + MAX_LEN])
-print('nb sequences:', len(sentences))
+print('Number sequences:', len(sentences))
 
 print('Vectorization...')
 x = np.zeros((len(sentences), MAX_LEN, len(chars)), dtype=np.bool)
@@ -71,7 +90,7 @@ model = Sequential()
 model.add(LSTM(128, input_shape=(MAX_LEN, len(chars))))
 model.add(Dense(len(chars), activation='softmax'))
 
-optimizer = RMSprop(lr=0.01)
+optimizer = RMSprop(lr=LEARNING_RATE)
 model.compile(loss='categorical_crossentropy', optimizer=optimizer)
 
 
