@@ -25,21 +25,31 @@ from datetime import datetime
 import os
 import time
 
-# Constants
+# Options
+CORPUS = 'nietzsche'
+PRINT_TEXT = True
+
+# I/O
 CORPUS_DIR = 'data'
-TB_LOGDIR = 'logdir'
+TB_LOG_DIR = 'logdir'
+OUTPUT_DIR = 'output'
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, CORPUS + '.txt')
+if not os.path.exists(OUTPUT_DIR):
+    os.mkdir(OUTPUT_DIR)
+
+# Constants
 DATETIME_FORMAT = '%y-%m-%d_%H-%M'
 
 # Parameters
 MAX_LEN = 40
 CHAR_STEP = 3
-DIVERSITIES = [0.2, 0.5, 1.0, 1.2]
+DIVERSITIES = [0.2, 0.4, 0.7, 1.0]
+GENERATION_LEN = 400
+
+# Hyperparameters
 BATCH_SIZE = 128
 EPOCHS = 60
 LEARNING_RATE = 0.01
-
-# Source
-CORPUS = 'nietzsche'
 
 
 def get_path(corpus='nietzsche'):
@@ -62,6 +72,7 @@ with io.open(get_path(corpus=CORPUS), encoding='utf-8') as f:
     text = f.read().lower()
 print('Corpus length:', len(text))
 
+# Create lookup tables for character and index
 chars = sorted(list(set(text)))
 print('Total chars:', len(chars))
 char_indices = dict((c, i) for i, c in enumerate(chars))
@@ -91,7 +102,8 @@ model.add(LSTM(128, input_shape=(MAX_LEN, len(chars))))
 model.add(Dense(len(chars), activation='softmax'))
 
 optimizer = RMSprop(lr=LEARNING_RATE)
-model.compile(loss='categorical_crossentropy', optimizer=optimizer)
+model.compile(loss='categorical_crossentropy', optimizer=optimizer,
+              metrics=['accuracy'])
 
 
 def sample(preds, diversity=1.0):
@@ -114,43 +126,60 @@ def sample(preds, diversity=1.0):
 def on_epoch_end(epoch, _):
     # Function invoked at end of each epoch. Prints generated text.
     print()
-    print('----- Generating text after Epoch: %d' % epoch)
+    print('*** Generating text after Epoch: %d' % epoch)
 
     start_index = random.randint(0, len(text) - MAX_LEN - 1)
-    for diversity in DIVERSITIES:
-        print('----- diversity:', diversity)
 
-        generated = ''
-        sentence = text[start_index: start_index + MAX_LEN]
-        generated += sentence
-        print('----- Generating with seed: "' + sentence + '"')
-        sys.stdout.write(generated)
+    with open(OUTPUT_FILE, 'a', encoding='utf-8') as output_file:
+        for diversity in DIVERSITIES:
+            generated = ''
+            sentence = text[start_index: start_index + MAX_LEN]
+            seed = sentence[:]
+            generated += sentence
 
-        for i in range(400):
-            x_pred = np.zeros((1, MAX_LEN, len(chars)))
-            for t, char in enumerate(sentence):
-                x_pred[0, t, char_indices[char]] = 1.
+            if PRINT_TEXT:
+                print('\n')
+                print('*** Diversity:', diversity)
+                print('*** Generating with seed: "' + sentence + '"')
+                sys.stdout.write(generated)
 
-            preds = model.predict(x_pred, verbose=0)[0]
-            next_index = sample(preds, diversity)
-            next_char = indices_char[next_index]
+            for i in range(GENERATION_LEN):
+                x_pred = np.zeros((1, MAX_LEN, len(chars)))
+                for t, char in enumerate(sentence):
+                    x_pred[0, t, char_indices[char]] = 1.
 
-            generated += next_char
-            sentence = sentence[1:] + next_char
+                preds = model.predict(x_pred, verbose=0)[0]
+                next_index = sample(preds, diversity)
+                next_char = indices_char[next_index]
 
-            sys.stdout.write(next_char)
-            sys.stdout.flush()
-        print()
+                generated += next_char
+                sentence = sentence[1:] + next_char
+
+                if PRINT_TEXT:
+                    sys.stdout.write(next_char)
+                    sys.stdout.flush()
+
+            output_text = '\n\nEpoch %s, Diversity %s, Seed: %s' \
+                          '\nGenerated: %s'\
+                          % (epoch, diversity, seed, generated)
+            try:
+                output_file.write(output_text)
+            except UnicodeEncodeError as e:
+                print('UnicodeError', e)
+            except Exception as e:
+                print('Other Exception', e)
+        if PRINT_TEXT:
+            print('\n')
 
 
+# Print callback
 print_callback = LambdaCallback(on_epoch_end=on_epoch_end)
 
-# Tensorboard
+# Tensorboard callback
 timestamp = datetime.fromtimestamp(time.time()).strftime(DATETIME_FORMAT)
-log_dir = os.path.join(TB_LOGDIR, timestamp)
+log_dir = os.path.join(TB_LOG_DIR, timestamp)
 tb_callback = TensorBoard(log_dir=log_dir)
 
-model.fit(x, y,
-          batch_size=BATCH_SIZE,
-          epochs=EPOCHS,
+# Train model
+model.fit(x, y, batch_size=BATCH_SIZE, epochs=EPOCHS,
           callbacks=[print_callback, tb_callback])
