@@ -43,7 +43,7 @@ DATETIME_FORMAT = '%y-%m-%d_%H-%M'
 # Parameters
 MAX_LEN = 40
 CHAR_STEP = 3
-DIVERSITIES = [0.2, 0.4, 0.7, 1.0]
+DIVERSITIES = [0.2, 0.4, 0.7, 1.0]  # High number: More randomness
 GENERATION_LEN = 400
 
 # Hyperparameters
@@ -55,15 +55,26 @@ LEARNING_RATE = 0.01
 def get_path(corpus='nietzsche'):
     """ Choose corpus for training
 
-    :param corpus: {'nietzsche', 'donquijote'}, default 'nietzsche'
+    :param corpus: {'nietzsche', 'donquijote', 'shakespeare', 'les-miserables',
+        'petit-prince', 'hemingway'}, default 'nietzsche'
     :return: path
         Path to selected corpus
     """
     if corpus == 'donquijote':
         path = os.path.join(CORPUS_DIR, 'donquijote.txt')
-    else:
+    elif corpus == 'hemingway':
+        path = os.path.join(CORPUS_DIR, 'hemingway.txt')
+    elif corpus == 'shakespeare':
+        path = os.path.join(CORPUS_DIR, 'shakespeare.txt')
+    elif corpus == 'les-miserables':
+        path = os.path.join(CORPUS_DIR, 'les-miserables.txt')
+    elif corpus == 'petit-prince':
+        path = os.path.join(CORPUS_DIR, 'petit-prince.txt')
+    elif corpus == 'nietzsche':
         origin = 'https://s3.amazonaws.com/text-datasets/nietzsche.txt'
         path = get_file('nietzsche.txt', origin=origin)
+    else:
+        raise ValueError('Choose valid corpus')
     return path
 
 
@@ -125,6 +136,13 @@ def sample(preds, diversity=1.0):
 
 def on_epoch_end(epoch, _):
     # Function invoked at end of each epoch. Prints generated text.
+    epoch = epoch + 1  # Start count at 1
+
+    # Do not log text generation for all epochs
+    log_result = epoch <= 5 or epoch % 10 == 0
+    if not log_result:
+        return
+
     print()
     print('*** Generating text after Epoch: %d' % epoch)
 
